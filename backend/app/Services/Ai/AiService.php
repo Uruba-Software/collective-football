@@ -50,6 +50,7 @@ class AiService
         try {
             $prism = Prism::text()
                 ->using($provider, $model)
+                ->withClientOptions($this->clientOptions())
                 ->withMaxTokens($config['max_tokens']);
 
             if ($systemPrompt !== null) {
@@ -106,6 +107,30 @@ class AiService
         }
 
         return $decoded;
+    }
+
+    /**
+     * Prism client options — base_url ve api_key enjeksiyonu.
+     * AI_BASE_URL doluysa onu kullanır (Ollama, Azure, LiteLLM vs.)
+     * AI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY sırasıyla denenir.
+     *
+     * @return array<string, string>
+     */
+    private function clientOptions(): array
+    {
+        $options = [];
+
+        $baseUrl = config('ai.base_url');
+        if (! empty($baseUrl)) {
+            $options['base_url'] = rtrim($baseUrl, '/');
+        }
+
+        $apiKey = config('ai.api_key');
+        if (! empty($apiKey)) {
+            $options['api_key'] = $apiKey;
+        }
+
+        return $options;
     }
 
     /**
