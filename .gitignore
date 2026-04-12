@@ -48,3 +48,6 @@ test-results/
 # Secrets
 *.pem
 *.p12
+
+# Local private notes (gitignored, machine-specific)
+SHORTCUTS.local.md
