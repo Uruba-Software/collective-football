@@ -1,0 +1,45 @@
+version: '3.9'
+
+# Collective Football — Production Overrides
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  app:
+    restart: always
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  reverb:
+    restart: always
+    deploy:
+      replicas: 2
+
+  nginx:
+    restart: always
+
+  postgres:
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}  # From .env in production
+
+  redis:
+    restart: always
+
+  rabbitmq:
+    restart: always
+
+  # Disable dev-only profiles
+  kibana:
+    profiles:
+      - disabled
+
+  vue-dev:
+    profiles:
+      - disabled

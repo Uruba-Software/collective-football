@@ -1,0 +1,203 @@
+name: Collective Football CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  PHP_VERSION: '8.3'
+  NODE_VERSION: '20'
+
+jobs:
+  # ─── Backend Quality ────────────────────────────────────────────────────────
+  backend-quality:
+    name: Backend Tests & Quality
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: collective_football_test
+          POSTGRES_USER: collective
+          POSTGRES_PASSWORD: collective_secret
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pgsql, pdo_pgsql, redis, zip, mbstring, xml, bcmath, intl, sockets, amqp
+          coverage: xdebug
+          tools: composer:v2, phpstan, phpcs
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install Composer dependencies
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Copy .env for testing
+        working-directory: backend
+        run: cp .env.ci .env
+
+      - name: Generate app key
+        working-directory: backend
+        run: php artisan key:generate
+
+      - name: Run migrations (test DB)
+        working-directory: backend
+        run: php artisan migrate --force
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_DATABASE: collective_football_test
+          DB_USERNAME: collective
+          DB_PASSWORD: collective_secret
+
+      - name: Code style check (Laravel Pint)
+        working-directory: backend
+        run: ./vendor/bin/pint --test
+
+      - name: Static analysis (PHPStan level 8)
+        working-directory: backend
+        run: ./vendor/bin/phpstan analyse --level=8 --memory-limit=256M
+
+      - name: Run PHPUnit tests with coverage
+        working-directory: backend
+        run: php artisan test --coverage --coverage-clover=coverage.xml
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_DATABASE: collective_football_test
+          DB_USERNAME: collective
+          DB_PASSWORD: collective_secret
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: backend/coverage.xml
+          flags: backend
+        if: github.ref == 'refs/heads/main'
+
+  # ─── Frontend Quality ───────────────────────────────────────────────────────
+  frontend-quality:
+    name: Frontend Tests & Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: TypeScript type check
+        working-directory: frontend
+        run: npm run type-check
+
+      - name: Run Vitest unit tests
+        working-directory: frontend
+        run: npm run test:unit
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        working-directory: frontend
+        run: npm run test:e2e
+        env:
+          CI: true
+
+      - name: Build check
+        working-directory: frontend
+        run: npm run build
+
+  # ─── Deploy to Hetzner (main branch only) ───────────────────────────────────
+  deploy:
+    name: Deploy to Hetzner
+    needs: [backend-quality, frontend-quality]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: deploy
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          script: |
+            set -e
+            cd /var/www/collective-football
+
+            echo "=== Pulling latest code ==="
+            git pull origin main
+
+            echo "=== Backend: Install dependencies ==="
+            cd backend
+            composer install --no-dev --optimize-autoloader --no-interaction
+
+            echo "=== Backend: Run migrations ==="
+            php artisan migrate --force
+
+            echo "=== Backend: Clear and cache configs ==="
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+            php artisan event:cache
+
+            echo "=== Frontend: Build ==="
+            cd ../frontend
+            npm ci
+            npm run build
+
+            echo "=== Restart workers ==="
+            sudo supervisorctl restart all
+
+            echo "=== Health check ==="
+            sleep 5
+            curl -f http://localhost/health || (echo "Health check FAILED" && exit 1)
+
+            echo "=== Deploy successful ==="

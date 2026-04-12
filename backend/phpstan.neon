@@ -1,0 +1,19 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app
+
+    # Level 8 — strict but not obsessive
+    level: 8
+
+    # Laravel-specific ignores
+    ignoreErrors:
+        - '#PHPDoc tag @var#'
+
+    excludePaths:
+        - app/Http/Middleware/TrustProxies.php
+
+    checkModelProperties: true
+    checkOctaneCompatibility: true

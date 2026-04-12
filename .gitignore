@@ -1,0 +1,50 @@
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.ci
+
+# Backend
+backend/vendor/
+backend/node_modules/
+backend/storage/logs/*.log
+backend/storage/framework/cache/
+backend/storage/framework/sessions/
+backend/storage/framework/views/
+backend/bootstrap/cache/
+backend/.phpunit.cache/
+backend/coverage.xml
+backend/.phpunit.result.cache
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Docker
+infrastructure/ssl/*.key
+infrastructure/ssl/*.crt
+infrastructure/ssl/*.pem
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Composer
+composer.phar
+
+# Testing
+.playwright/
+test-results/
+
+# Secrets
+*.pem
+*.p12
