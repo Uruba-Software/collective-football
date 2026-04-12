@@ -254,7 +254,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: collective_admin
-      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
+      GF_INSTALL_PLUGINS: ""
     volumes:
       - grafana_data:/var/lib/grafana
       - ./infrastructure/docker/grafana/provisioning:/etc/grafana/provisioning
