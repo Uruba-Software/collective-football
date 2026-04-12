@@ -1,0 +1,367 @@
+{
+  "info": {
+    "_postman_id": "collective-football-api",
+    "name": "Collective Football API",
+    "description": "Auto-maintained API collection for Collective Football — The Living Game.\n\nThis collection is the source of truth for all API endpoints.\nEvery new endpoint MUST be added here with:\n- Example request/response\n- Test assertions\n- Environment variable usage\n\nEnvironments: local (localhost:8001), docker (collective.docker:8001), staging, production",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "0.1.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-set base URL from environment",
+          "pm.environment.set('base_url', pm.environment.get('base_url') || 'http://localhost:8001');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8001",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health & System",
+      "description": "Infrastructure health checks and system status endpoints",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Returns application health status. Checks DB, Redis, RabbitMQ, Elasticsearch.\nUsed by load balancers and Zabbix monitoring."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Health check returns 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response time < 500ms', function() {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                  "});",
+                  "pm.test('Returns PHP 8.5', function() {",
+                  "    pm.expect(pm.response.headers.get('X-Powered-By')).to.include('PHP/8.5');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Laravel Up Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/up",
+              "host": ["{{base_url}}"],
+              "path": ["up"]
+            },
+            "description": "Laravel built-in health endpoint. Returns 200 if app is running."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('App is up', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Authentication endpoints (Laravel Sanctum)",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Manager login. Returns Sanctum token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.environment.set('auth_token', json.token);",
+                  "    pm.test('Token received', () => pm.expect(json.token).to.be.a('string'));",
+                  "}",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user"]
+            },
+            "description": "Get current authenticated manager profile."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns user object', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json).to.have.property('email');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Match Engine",
+      "description": "Match preparation, simulation, and result recording",
+      "item": [
+        {
+          "name": "Prepare Match Context",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"home_team_id\": 1,\n  \"away_team_id\": 2,\n  \"match_type\": \"league\",\n  \"mode\": \"single_vs_computer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/match/prepare",
+              "host": ["{{base_url}}"],
+              "path": ["api", "match", "prepare"]
+            },
+            "description": "Prepares full pre-match context package for the frontend engine.\nReturns: both teams with 4-layer player data, referee, stadium, weather, crowd context.\nThis is the single largest API response — must be under 200ms."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response under 500ms', () => pm.expect(pm.response.responseTime).to.be.below(500));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has match_id', () => pm.expect(json).to.have.property('match_id'));",
+                  "pm.test('Has home_team', () => pm.expect(json).to.have.property('home_team'));",
+                  "pm.test('Has weather', () => pm.expect(json).to.have.property('weather'));",
+                  "pm.test('Has referee', () => pm.expect(json).to.have.property('referee'));",
+                  "if (json.match_id) pm.environment.set('last_match_id', json.match_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record Match Result",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"match_id\": \"{{last_match_id}}\",\n  \"home_score\": 2,\n  \"away_score\": 1,\n  \"events\": [],\n  \"final_player_states\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/match/result",
+              "host": ["{{base_url}}"],
+              "path": ["api", "match", "result"]
+            },
+            "description": "Records match result from frontend engine.\nTriggers: standings update, player form update, market value recalculation, character fracture processing."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 201', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Match Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/match/{{last_match_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "match", "{{last_match_id}}"]
+            },
+            "description": "Get full match details including all events, player states, weather snapshot."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has events array', () => pm.expect(json).to.have.property('events'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Players",
+      "description": "Player data — all four layers",
+      "item": [
+        {
+          "name": "List Players",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": {
+              "raw": "{{base_url}}/api/players?team_id=1&per_page=25",
+              "host": ["{{base_url}}"],
+              "path": ["api", "players"],
+              "query": [
+                {"key": "team_id", "value": "1"},
+                {"key": "per_page", "value": "25"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Player (All 4 Layers)",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": {
+              "raw": "{{base_url}}/api/players/{{player_id}}?include=ceiling,character,form,climate_adaptation",
+              "host": ["{{base_url}}"],
+              "path": ["api", "players", "{{player_id}}"],
+              "query": [
+                {"key": "include", "value": "ceiling,character,form,climate_adaptation"}
+              ]
+            },
+            "description": "Returns player with all four data layers:\n- ceiling: immutable potential\n- character: 109 attributes\n- form: weekly state\n- climate_adaptation: nationality-based comfort values"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Teams",
+      "description": "Team management — identity, squad, tactics",
+      "item": [
+        {
+          "name": "Get Team",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": {
+              "raw": "{{base_url}}/api/teams/{{team_id}}?include=identity,squad,stadium",
+              "host": ["{{base_url}}"],
+              "path": ["api", "teams", "{{team_id}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
