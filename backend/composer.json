@@ -11,10 +11,14 @@
     "require": {
         "php": "^8.4",
         "bschmitt/laravel-amqp": "^3.2",
+        "dedoc/scramble": "^0.13.18",
         "laravel/framework": "^13.0",
+        "laravel/horizon": "^5.45",
         "laravel/octane": "^2.17",
+        "laravel/pulse": "^1.7",
         "laravel/reverb": "^1.10",
         "laravel/sanctum": "^4.0",
+        "laravel/telescope": "^5.20",
         "laravel/tinker": "^3.0",
         "php-amqplib/php-amqplib": "^3.7",
         "predis/predis": "^3.4",
@@ -31,7 +35,9 @@
         "nunomaduro/collision": "^8.6",
         "pestphp/pest": "^4.5",
         "phpstan/phpstan": "^2.1",
-        "phpunit/phpunit": "^12.5.12"
+        "phpunit/phpunit": "^12.5.12",
+        "rector/rector": "^2.4",
+        "roave/security-advisories": "dev-latest"
     },
     "autoload": {
         "psr-4": {

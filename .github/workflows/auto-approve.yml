@@ -1,0 +1,46 @@
+name: Auto-Approve Passing PRs
+
+on:
+  pull_request_review:
+    types: [submitted]
+  check_suite:
+    types: [completed]
+  workflow_run:
+    workflows: ["Collective Football CI/CD"]
+    types: [completed]
+
+jobs:
+  auto-approve:
+    name: Auto-approve if all checks pass
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Find associated PR
+        id: find-pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.payload.workflow_run.head_branch}`
+            });
+            return prs.length > 0 ? prs[0].number : null;
+          result-encoding: string
+
+      - name: Approve PR
+        if: steps.find-pr.outputs.result != 'null'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: parseInt('${{ steps.find-pr.outputs.result }}'),
+              event: 'APPROVE',
+              body: '✅ All CI checks passed. Auto-approved by collective-football-bot.'
+            });
