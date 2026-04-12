@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  PHP_VERSION: '8.3'
+  PHP_VERSION: '8.5'
   NODE_VERSION: '20'
 
 jobs:
@@ -166,38 +166,31 @@ jobs:
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.HETZNER_HOST }}
-          username: deploy
+          username: root
           key: ${{ secrets.HETZNER_SSH_KEY }}
           script: |
             set -e
-            cd /var/www/collective-football
+            cd /opt/uruba/collective-football
 
             echo "=== Pulling latest code ==="
             git pull origin main
 
             echo "=== Backend: Install dependencies ==="
-            cd backend
-            composer install --no-dev --optimize-autoloader --no-interaction
+            docker exec cf_app sh -c "cd /var/www/backend && composer install --no-dev --optimize-autoloader --no-interaction"
 
             echo "=== Backend: Run migrations ==="
-            php artisan migrate --force
+            docker exec cf_app sh -c "cd /var/www/backend && php artisan migrate --force"
 
             echo "=== Backend: Clear and cache configs ==="
-            php artisan config:cache
-            php artisan route:cache
-            php artisan view:cache
-            php artisan event:cache
+            docker exec cf_app sh -c "cd /var/www/backend && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan event:cache"
 
             echo "=== Frontend: Build ==="
-            cd ../frontend
+            cd frontend
             npm ci
             npm run build
 
-            echo "=== Restart workers ==="
-            sudo supervisorctl restart all
-
             echo "=== Health check ==="
             sleep 5
-            curl -f http://localhost/health || (echo "Health check FAILED" && exit 1)
+            curl -f http://localhost:8001/up || (echo "Health check FAILED" && exit 1)
 
             echo "=== Deploy successful ==="
