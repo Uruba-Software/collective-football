@@ -260,7 +260,7 @@ services:
       - ./infrastructure/docker/grafana/provisioning:/etc/grafana/provisioning
       - ./infrastructure/docker/grafana/dashboards:/var/lib/grafana/dashboards
     ports:
-      - "3000:3000"
+      - "3001:3000"  # 3001: port 3000 reserved for Redmine on prod server
     networks:
       - collective
     depends_on:
