@@ -3,6 +3,9 @@
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
 
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
+
+
 > *"Football is a collective game."*
 
 An online, multiplayer football management game where the entire living community around a club — players, staff, fans, city, history — is simulated as a collective organism. Every match is a living event. Every player is a human being.
